@@ -1,0 +1,40 @@
+pipeline {
+    agent any
+    
+    environment{
+        DOCKER_IMAGE_NAME = 'mypythonimage'
+        DOCKERFILE_PATH = 'Dockerfile'
+        CONTAINER_NAME= 'pythonv1'
+    }
+    stages {
+        stage(checkout){
+            steps{
+                git 'https://github.com/rudravasu2021/DockerApp.git'
+                
+            }
+        }
+        stage('DockerBuild') {
+            steps {
+                script{
+                    docker.build("${DOCKER_IMAGE_NAME}" , "-f ${DOCKERFILE_PATH} .")
+                }
+            }
+        }
+        stage('run conatiner'){
+            steps{
+                script{
+                    // Check if the container exists
+                    def containerExists = sh(script: "docker ps -a --format '{{.Names}}' | grep ${CONTAINER_NAME}", returnStatus: true)
+                    
+                    // Stop and remove the existing container if it exists
+                    if (containerExists == 0) {
+                        sh "docker stop ${CONTAINER_NAME}"
+                        sh "docker rm ${CONTAINER_NAME}"
+                    }
+                    sh "docker run -d -p 8580:5000 --name ${CONTAINER_NAME} ${DOCKER_IMAGE_NAME}"
+                }
+            }
+        }
+        
+    }
+}
