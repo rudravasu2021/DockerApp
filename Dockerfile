@@ -1,6 +1,6 @@
 #Dockerfile, image, container
 
-FROM python:3.11.5-slim-bookworm
+FROM python:latest
 ADD . /python-flask
 WORKDIR /python-flask
 RUN pip install -r requirements.txt
