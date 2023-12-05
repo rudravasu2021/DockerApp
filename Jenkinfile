@@ -2,9 +2,9 @@ pipeline {
     agent any
     
     environment{
-        DOCKER_IMAGE_NAME = 'mypythonimage'
+        DOCKER_IMAGE_NAME = 'alpine:3.18'
         DOCKERFILE_PATH = 'Dockerfile'
-        CONTAINER_NAME= 'pythonv1'
+        CONTAINER_NAME= 'pythonv3'
     }
     stages {
         stage(checkout){
