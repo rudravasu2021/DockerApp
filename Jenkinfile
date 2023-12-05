@@ -1,13 +1,14 @@
 pipeline {
     agent any
-    
     environment{
         DOCKER_IMAGE_NAME = 'alpine:3.18'
         DOCKERFILE_PATH = 'Dockerfile'
         CONTAINER_NAME= 'pythonv3'
+        DOCKER_CREDENTIAL_ID = 'DOCKER'
+        DOCKER_REGISTRY = 'docker.io'
     }
     stages {
-        stage(checkout){
+        stage('checkout'){
             steps{
                 git 'https://github.com/rudravasu2021/DockerApp.git'
                 
@@ -16,7 +17,7 @@ pipeline {
         stage('DockerBuild') {
             steps {
                 script{
-                    docker.build("${DOCKER_IMAGE_NAME}" , "-f ${DOCKERFILE_PATH} .")
+                    docker.build("rudravasu2021/${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}" , "-f ${DOCKERFILE_PATH} .")
                 }
             }
         }
@@ -31,10 +32,41 @@ pipeline {
                         sh "docker stop ${CONTAINER_NAME}"
                         sh "docker rm ${CONTAINER_NAME}"
                     }
-                    sh "docker run -d -p 8580:5000 --name ${CONTAINER_NAME} ${DOCKER_IMAGE_NAME}"
+                    sh "docker run -d -p 8980:5000 --name ${CONTAINER_NAME} rudravasu2021/${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
                 }
             }
         }
+        stage('Security Scan') {
+            steps {
+                script {
+                    def trivyOutput = sh(script: "trivy image rudravasu2021/${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}  --exit-code 1 --severity HIGH", returnStdout: true).trim()
+                    echo "Trivy Scan Results:\n${trivyOutput}"
+                    if (trivyOutput.contains("high vulnerabilities")) {
+                        error "High vulnerabilities found. Build failed."
+                    }
+                }
+            }
+        }
+  stage('Push Docker Image') {
+            steps {
+                script {
+                    // Authenticate with Docker registry using Jenkins credentials
+                    withCredentials([usernamePassword(credentialsId: DOCKER_CREDENTIAL_ID, usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                        def dockerAuth = "--username=${DOCKER_USERNAME} --password-stdin"
+                        sh "echo ${DOCKER_PASSWORD} | docker login ${DOCKER_REGISTRY} ${dockerAuth}"
+
+                        
+                        // Push Docker image to registry
+                        sh "docker push ${DOCKER_REGISTRY}/rudravasu2021/${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
+
+                        // Logout from Docker registry
+                        sh "docker logout ${DOCKER_REGISTRY}"
+                    }
+                }
+            }
+ }
+     
+     
         
-    }
+}
 }
