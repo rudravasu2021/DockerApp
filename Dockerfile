@@ -1,4 +1,5 @@
 #Dockerfile, image, container
+# images tested python:3.9.18-alpine3.18 ,python:3.11.5-slim-bookworm , python:3.13-rc-alpine3.17
 
 FROM python:3.13-rc-alpine3.17
 ADD . /python-flask
