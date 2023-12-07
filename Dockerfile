@@ -5,4 +5,5 @@ FROM python:3.11.7-slim-bullseye
 ADD . /python-flask
 WORKDIR /python-flask
 RUN pip install -r requirements.txt
+RUN apt-get update
 CMD [ "python", "./myapp.py" ]
