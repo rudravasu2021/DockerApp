@@ -3,7 +3,6 @@
 
 FROM python:3.11.7-slim-bullseye
 RUN apt-get update 
-RUN apt-get upgrade
 ADD . /python-flask
 WORKDIR /python-flask
 RUN pip install -r requirements.txt
