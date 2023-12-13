@@ -1,75 +1,74 @@
-def img
 pipeline {
-    environment {
-        registry = "kss7/python-jenkins" //To push an image to Docker Hub, you must first name your local image using your Docker Hub username and the repository name that you created through Docker Hub on the web.
-        registryCredential = 'docker-hub-login'
-        dockerImage = ''
+    agent {
+        label 'linux-docker'
     }
-    agent any
+    environment{
+        DOCKER_IMAGE_NAME = 'pythonimage77'
+        DOCKERFILE_PATH = 'Dockerfile'
+        CONTAINER_NAME= 'pythonv3'
+        DOCKER_CREDENTIAL_ID = 'DOCKER'
+        DOCKER_REGISTRY = 'docker.io'
+    }
     stages {
-        stage('checkout') {
-            steps {
-                git 'https://github.com/kss7/SimpleFlaskUI.git'
-            }
-        }
-
-        stage ('Stop previous running container'){
+        stage('checkout'){
             steps{
-                sh returnStatus: true, script: 'docker stop $(docker ps -a | grep ${JOB_NAME} | awk \'{print $1}\')'
-                sh returnStatus: true, script: 'docker rmi $(docker images | grep ${registry} | awk \'{print $3}\') --force' //this will delete all images
-                sh returnStatus: true, script: 'docker rm ${JOB_NAME}'
+                git 'https://github.com/rudravasu2021/DockerApp.git'
+                
             }
         }
-
-
-        stage('Build Image') {
+        stage('DockerBuild') {
             steps {
-                script {
-                    img = registry + ":${env.BUILD_ID}"
-                    println ("${img}")
-                    dockerImage = docker.build("${img}")
+                script{
+                    docker.build("rudravasu2021/${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}" , "-f ${DOCKERFILE_PATH} .")
                 }
             }
         }
-
-
-
-        stage('Test - Run Docker Container on Jenkins node') {
-           steps {
-
-                sh label: '', script: "docker run -d --name ${JOB_NAME} -p 5000:5000 ${img}"
-          }
+        stage('run conatiner'){
+            steps{
+                script{
+                    // Check if the container exists
+                    def containerExists = sh(script: "docker ps -a --format '{{.Names}}' | grep ${CONTAINER_NAME}", returnStatus: true)
+                    
+                    // Stop and remove the existing container if it exists
+                    if (containerExists == 0) {
+                        sh "docker stop ${CONTAINER_NAME}"
+                        sh "docker rm ${CONTAINER_NAME}"
+                    }
+                    sh "docker run -d -p 8980:5000 --name ${CONTAINER_NAME} rudravasu2021/${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
+                }
+            }
         }
-
-        stage('Push To DockerHub') {
+        stage('Security Scan') {
             steps {
                 script {
-                    docker.withRegistry( 'https://registry.hub.docker.com ', registryCredential ) {
-                        dockerImage.push()
+                    def trivyOutput = sh(script: "trivy image rudravasu2021/${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}  --exit-code 1", returnStdout: true).trim()
+                    echo "Trivy Scan Results:\n${trivyOutput}"
+                    if (trivyOutput.contains("high vulnerabilities")) {
+                        error "High vulnerabilities found. Build failed."
                     }
                 }
             }
-        }
-
-        stage('Deploy to Test Server') {
+       } 
+  stage('Push Docker Image') {
             steps {
                 script {
-                    def stopcontainer = "docker stop ${JOB_NAME}"
-                    def delcontName = "docker rm ${JOB_NAME}"
-                    def delimages = 'docker image prune -a --force'
-                    def drun = "docker run -d --name ${JOB_NAME} -p 5000:5000 ${img}"
-                    println "${drun}"
-                    sshagent(['docker-test']) {
-                        sh returnStatus: true, script: "ssh -o StrictHostKeyChecking=no docker@192.168.1.16 ${stopcontainer} "
-                        sh returnStatus: true, script: "ssh -o StrictHostKeyChecking=no docker@192.168.1.16 ${delcontName}"
-                        sh returnStatus: true, script: "ssh -o StrictHostKeyChecking=no docker@192.168.1.16 ${delimages}"
+                    // Authenticate with Docker registry using Jenkins credentials
+                    withCredentials([usernamePassword(credentialsId: DOCKER_CREDENTIAL_ID, usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                        def dockerAuth = "--username=${DOCKER_USERNAME} --password-stdin"
+                        sh "echo ${DOCKER_PASSWORD} | docker login ${DOCKER_REGISTRY} ${dockerAuth}"
 
-                    // some block
-                        sh "ssh -o StrictHostKeyChecking=no docker@192.168.1.16 ${drun}"
+                        
+                        // Push Docker image to registry
+                        sh "docker push ${DOCKER_REGISTRY}/rudravasu2021/${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
+
+                        // Logout from Docker registry
+                        sh "docker logout ${DOCKER_REGISTRY}"
                     }
                 }
             }
-        }
-
-
-    }
+ }
+     
+     
+        
+}
+}
