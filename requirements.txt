@@ -1,7 +1,7 @@
 click==8.0.4
 colorama
-Flask==2.0.3
+Flask==2.2.5
 itsdangerous==2.1.2
 Jinja2==3.1.1
 MarkupSafe==2.1.1
-Werkzeug==2.0.3
+Werkzeug==3.0.1
